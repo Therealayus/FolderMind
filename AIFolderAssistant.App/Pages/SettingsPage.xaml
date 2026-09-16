@@ -1,0 +1,47 @@
+<Page
+    x:Class="AIFolderAssistant.App.Pages.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <ScrollViewer>
+        <StackPanel Margin="24" Spacing="12" MaxWidth="640">
+            <TextBlock Text="Settings" FontSize="22" FontWeight="SemiBold" />
+
+            <TextBlock Text="General" FontWeight="SemiBold" />
+            <ToggleSwitch Header="Start FolderMind when Windows starts"
+                          IsOn="{x:Bind ViewModel.StartWithWindows, Mode=TwoWay}" />
+            <ToggleSwitch Header="Show notifications"
+                          IsOn="{x:Bind ViewModel.ShowNotifications, Mode=TwoWay}" />
+            <ToggleSwitch Header="Run in background (tray)" IsOn="{x:Bind ViewModel.RunInBackground, Mode=TwoWay}" />
+
+            <TextBlock Text="Monitoring" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <ToggleSwitch Header="Enable monitoring" IsOn="{x:Bind ViewModel.MonitoringEnabled, Mode=TwoWay}" />
+            <TextBlock Text="FolderMind analyzes your files to suggest names. Local analysis stays on this PC; cloud AI is optional and off by default."
+                       TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+            <TextBlock Text="AI" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <ToggleSwitch Header="Enable AI" IsOn="{x:Bind ViewModel.AiEnabled, Mode=TwoWay}" />
+            <ToggleSwitch Header="Allow cloud analysis (sends summaries only, never full files)"
+                          IsOn="{x:Bind ViewModel.AllowCloud, Mode=TwoWay}" />
+            <TextBox Header="Endpoint (OpenAI-compatible)" Text="{x:Bind ViewModel.AiEndpoint, Mode=TwoWay}" />
+            <TextBox Header="Model" Text="{x:Bind ViewModel.AiModel, Mode=TwoWay}" />
+            <PasswordBox x:Name="ApiKeyBox" Header="API key (stored encrypted with DPAPI)" />
+            <Button Content="Save API key" Click="SaveKey_Click" />
+
+            <TextBlock Text="Privacy" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <ToggleSwitch Header="Local-only mode" IsOn="{x:Bind ViewModel.LocalOnly, Mode=TwoWay}" />
+
+            <TextBlock Text="Explorer" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <Button Content="Toggle Explorer context menu" Click="Menu_Click" />
+
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                <Button Content="Save" Click="Save_Click" Style="{ThemeResource AccentButtonStyle}" />
+                <Button Content="Reset to defaults" Click="Reset_Click" />
+            </StackPanel>
+            <TextBlock Text="{x:Bind ViewModel.Message, Mode=OneWay}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        </StackPanel>
+    </ScrollViewer>
+</Page>
