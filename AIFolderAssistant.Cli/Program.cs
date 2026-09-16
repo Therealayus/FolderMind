@@ -24,6 +24,7 @@ int Usage()
     Console.WriteLine("  rename <folder> <newName>     Rename (explicit, safe, recorded)");
     Console.WriteLine("  undo <folder>                 Undo last rename when safe");
     Console.WriteLine("  history [--clear]");
+    Console.WriteLine("  config [show|set <Section.Prop> <value>]");
     return 1;
 }
 
@@ -41,6 +42,7 @@ try
         "rename" => await RenameAsync(provider, args[1..]),
         "undo" => await UndoAsync(provider, args[1..]),
         "history" => History(provider, args[1..]),
+        "config" => Config(provider, args[1..]),
         _ => Usage()
     };
 }
@@ -265,6 +267,72 @@ static async Task<int> UndoAsync(ServiceProvider provider, string[] rest)
     }
     Console.WriteLine("Rename undone.");
     return 0;
+}
+
+static int Config(ServiceProvider provider, string[] rest)
+{
+    var settings = provider.GetRequiredService<ISettingsService>();
+    settings.Load();
+    var root = settings.Current;
+
+    if (rest.Length == 0 || rest[0] == "show")
+    {
+        Console.WriteLine($"Monitoring.Enabled           = {root.Monitoring.Enabled}");
+        Console.WriteLine($"Monitoring.DebounceSeconds   = {root.Monitoring.DebounceSeconds}");
+        Console.WriteLine($"Monitoring.MinimumConfidence = {root.Monitoring.MinimumConfidence}");
+        Console.WriteLine($"General.StartWithWindows     = {root.General.StartWithWindows}");
+        Console.WriteLine($"General.ShowNotifications    = {root.General.ShowNotifications}");
+        Console.WriteLine($"AI.Enabled                   = {root.AI.Enabled}");
+        Console.WriteLine($"AI.AllowCloud                = {root.AI.AllowCloud}");
+        Console.WriteLine($"AI.Endpoint                  = {root.AI.Endpoint}");
+        Console.WriteLine($"Privacy.LocalOnly            = {root.Privacy.LocalOnly}");
+        return 0;
+    }
+
+    if (rest[0] == "set" && rest.Length >= 3)
+    {
+        var (section, prop) = rest[1].Split('.') switch { var p when p.Length == 2 => (p[0], p[1]), _ => ((string?)null, (string?)null) };
+        var value = rest[2];
+        var applied = (section?.ToLowerInvariant(), prop?.ToLowerInvariant()) switch
+        {
+            ("monitoring", "enabled") => SetBool(value, v => root.Monitoring.Enabled = v),
+            ("monitoring", "debounceseconds") => SetInt(value, v => root.Monitoring.DebounceSeconds = Math.Clamp(v, 1, 60)),
+            ("monitoring", "minimumconfidence") => SetDouble(value, v => root.Monitoring.MinimumConfidence = Math.Clamp(v, 0.5, 1.0)),
+            ("general", "startwithwindows") => SetBool(value, v => root.General.StartWithWindows = v),
+            ("general", "shownotifications") => SetBool(value, v => root.General.ShowNotifications = v),
+            _ => false
+        };
+        if (!applied)
+        {
+            Console.Error.WriteLine($"Unknown setting: {rest[1]}");
+            return 1;
+        }
+        settings.Save();
+        Console.WriteLine($"{rest[1]} = {value}");
+        return 0;
+    }
+
+    Console.Error.WriteLine("Usage: FolderMind config [show|set <Section.Prop> <value>]");
+    return 1;
+
+    static bool SetBool(string s, Action<bool> set)
+    {
+        if (!bool.TryParse(s, out var v)) return false;
+        set(v);
+        return true;
+    }
+    static bool SetInt(string s, Action<int> set)
+    {
+        if (!int.TryParse(s, out var v)) return false;
+        set(v);
+        return true;
+    }
+    static bool SetDouble(string s, Action<double> set)
+    {
+        if (!double.TryParse(s, out var v)) return false;
+        set(v);
+        return true;
+    }
 }
 
 static int History(ServiceProvider provider, string[] rest)

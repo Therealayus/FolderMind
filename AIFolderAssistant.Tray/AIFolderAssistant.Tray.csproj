@@ -1,15 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
     <Platforms>x64;x86;ARM64</Platforms>
     <RuntimeIdentifiers>win-x64;win-x86;win-arm64</RuntimeIdentifiers>
-    <RootNamespace>AIFolderAssistant.Cli</RootNamespace>
-    <AssemblyName>FolderMind.Cli</AssemblyName>
-    <ApplicationName>FolderMind AI (Engine Host)</ApplicationName>
+    <RootNamespace>AIFolderAssistant.Tray</RootNamespace>
+    <AssemblyName>FolderMind</AssemblyName>
+    <ApplicationName>FolderMind AI</ApplicationName>
   </PropertyGroup>
 
   <ItemGroup>

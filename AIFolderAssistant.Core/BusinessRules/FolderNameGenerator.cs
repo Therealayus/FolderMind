@@ -44,6 +44,46 @@ public class FolderNameGenerator : IFolderNameGenerator
         ["images"] = new List<string> { "Image Gallery", "Photos", "Picture Folder" },
     };
 
+    private static readonly Dictionary<string, string> TriggerCategories = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["invoice"] = "Financial", ["receipt"] = "Financial", ["tax"] = "Financial",
+        ["payment"] = "Financial", ["bank"] = "Financial", ["bill"] = "Financial",
+        ["react"] = "Web Development", ["node"] = "Web Development",
+        ["typescript"] = "Web Development", ["javascript"] = "Web Development",
+        ["cs"] = "Software Development", ["java"] = "Software Development",
+        ["python"] = "Software Development", ["go"] = "Software Development",
+        ["cpp"] = "Software Development",
+        ["gst"] = "Financial", ["pdf"] = "Documents", ["docx"] = "Documents",
+        ["project"] = "Projects",
+        ["trip"] = "Travel", ["goa"] = "Travel", ["vacation"] = "Travel",
+        ["photos"] = "Photos", ["images"] = "Photos",
+    };
+
+    private static readonly Dictionary<string, string> CategoryPrimaryName = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Financial"] = "Financial Documents",
+        ["Web Development"] = "Web Development",
+        ["Software Development"] = "Software Development",
+        ["Documents"] = "Documents",
+        ["Projects"] = "Project Files",
+        ["Travel"] = "Trip Photos",
+        ["Photos"] = "Photo Collection",
+    };
+
+    private static string TriggerCategory(string trigger) =>
+        TriggerCategories.TryGetValue(trigger, out var category) ? category : "General";
+
+    private static string? TopicCategory(string topic)
+    {
+        foreach (var (category, primary) in CategoryPrimaryName)
+        {
+            if (topic.Equals(category, StringComparison.OrdinalIgnoreCase) ||
+                topic.Equals(primary, StringComparison.OrdinalIgnoreCase))
+                return category;
+        }
+        return null;
+    }
+
     /// <summary>
     /// Generates a folder name suggestion based on analysis data.
     /// </summary>
@@ -83,38 +123,46 @@ public class FolderNameGenerator : IFolderNameGenerator
             allKeywords.Add(topic);
         }
 
-        // Score each trigger keyword by how many files mention it; the best
-        // trigger's primary suggestion becomes the folder name.
-        var triggerHits = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        // Aggregate trigger hits per CATEGORY (invoice + receipt + gst all feed
+        // "Financial") so mixed-but-coherent folders still resolve. Match against
+        // the stem only so extension triggers ("pdf") never outrank semantics.
+        var categoryHits = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in analysis.Files)
         {
-            // Match against the stem only so extension triggers ("pdf", "docx")
-            // never outrank semantic triggers ("invoice", "react").
             var haystack = Path.GetFileNameWithoutExtension(file.FileName ?? string.Empty).ToLowerInvariant();
+            var fileCategories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var trigger in KeywordCategories.Keys)
             {
-                if (haystack.Contains(trigger.ToLowerInvariant()))
-                    triggerHits[trigger] = triggerHits.TryGetValue(trigger, out var n) ? n + 1 : 1;
+                if (haystack.Contains(trigger.ToLowerInvariant(), StringComparison.Ordinal))
+                    fileCategories.Add(TriggerCategory(trigger));
             }
+            foreach (var category in fileCategories)
+                categoryHits[category] = categoryHits.TryGetValue(category, out var n) ? n + 1 : 1;
         }
 
-        if (triggerHits.Count > 0)
+        // Detected topics vote for their category too.
+        foreach (var topic in analysis.DetectedTopics)
         {
-            var best = triggerHits.OrderByDescending(kvp => kvp.Value).First();
-            // Require the trigger in a meaningful share of files (>=25%, at least 1 of few).
+            var category = TopicCategory(topic);
+            if (category is not null)
+                categoryHits[category] = categoryHits.TryGetValue(category, out var n) ? n + 1 : 1;
+        }
+
+        if (categoryHits.Count > 0)
+        {
+            var best = categoryHits.OrderByDescending(kvp => kvp.Value).First();
+            // Require the winning category in a meaningful share of files (>=25%).
             var share = (double)best.Value / Math.Max(1, analysis.Files.Count);
-            if (share >= 0.25)
-                return KeywordCategories[best.Key].First();
+            if (share >= 0.25 && CategoryPrimaryName.TryGetValue(best.Key, out var primary))
+                return primary;
         }
 
-        // Fallback: generate a name based on file types and count
-        var extension = analysis.Files.Count > 0 ? Path.GetExtension(analysis.Files[0].FileName ?? "") : "";
+        // Fallback: dominant extension + count (consistent with the reason text).
         var fileCount = analysis.Files.Count;
-
-        if (!string.IsNullOrEmpty(extension))
+        if (analysis.ExtensionCounts.Count > 0)
         {
-            var extWithoutDot = extension.TrimStart('.');
-            return $"{fileCount} {extWithoutDot.ToUpper()} Files";
+            var topExt = analysis.ExtensionCounts.OrderByDescending(kvp => kvp.Value).First().Key;
+            return $"{fileCount} {topExt.ToUpperInvariant()} Files";
         }
 
         return $"Folder ({fileCount})";

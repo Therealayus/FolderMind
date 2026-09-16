@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AIFolderAssistant.Tests", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AIFolderAssistant.Cli", "AIFolderAssistant.Cli\AIFolderAssistant.Cli.csproj", "{C0DD9170-1498-45CA-B1BC-4E7566D98813}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AIFolderAssistant.Tray", "AIFolderAssistant.Tray\AIFolderAssistant.Tray.csproj", "{BAA56598-0552-4150-8E93-05DEB3B3BAA7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -42,5 +44,9 @@ Global
 		{C0DD9170-1498-45CA-B1BC-4E7566D98813}.Debug|Any CPU.Build.0 = Debug|x64
 		{C0DD9170-1498-45CA-B1BC-4E7566D98813}.Release|Any CPU.ActiveCfg = Release|x64
 		{C0DD9170-1498-45CA-B1BC-4E7566D98813}.Release|Any CPU.Build.0 = Release|x64
+		{BAA56598-0552-4150-8E93-05DEB3B3BAA7}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{BAA56598-0552-4150-8E93-05DEB3B3BAA7}.Debug|Any CPU.Build.0 = Debug|x64
+		{BAA56598-0552-4150-8E93-05DEB3B3BAA7}.Release|Any CPU.ActiveCfg = Release|x64
+		{BAA56598-0552-4150-8E93-05DEB3B3BAA7}.Release|Any CPU.Build.0 = Release|x64
 	EndGlobalSection
 EndGlobal

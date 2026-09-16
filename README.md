@@ -36,9 +36,21 @@ gets the suggestion **Financial Documents** with an explanation and a confidence
 & "C:\Program Files\dotnet\dotnet" test "D:\FolderMind\AIFolderAssistant.Tests\AIFolderAssistant.Tests.csproj" -c Release -p:Platform=x64
 ```
 
-## Running the full app
+## Install (recommended)
 
-1. Open `FolderMind.sln` in Visual Studio 2022.
+```powershell
+powershell -File D:\FolderMind\installer\Publish.ps1   # builds Tray + CLI
+powershell -File D:\FolderMind\installer\Install.ps1   # Start Menu, tray app, context menu
+```
+
+This installs the **tray app** (`FolderMind.exe`: lives in the system tray,
+balloon notifications, suggestions window, pause/resume, start-with-Windows)
+plus the **engine CLI** (`FolderMind.Cli.exe`) for scripting. No console window
+ever flashes: both entry points are windowed/headless-safe.
+
+## Running the full WinUI app
+
+1. Open `FolderMind.sln` in Visual Studio 2022 (required for XAML compilation).
 2. Set `AIFolderAssistant.App` as startup project, platform **x64**.
 3. Press F5. On first run: pick folders to monitor → keep Local-only mode → Ready.
 4. The app lives in the system tray. Create a folder, drop files in, wait ~3s, get a suggestion.

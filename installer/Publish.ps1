@@ -1,43 +1,46 @@
 <#!
 .SYNOPSIS
-    Publishes FolderMind AI as a self-contained single-file exe.
-    - Engine host (CLI): builds headless with the .NET SDK.
-    - WinUI app: requires Visual Studio 2022 (XAML compiler needs full MSBuild).
+    Publishes FolderMind AI as self-contained single-file exes.
+    - Tray (default): system-tray background app, builds headless with the .NET SDK.
+    - Cli: engine-host console for scripting/admin, builds headless.
+    - App (WinUI): requires Visual Studio 2022 (XAML compiler needs full MSBuild).
 .EXAMPLE
-    powershell -File installer\Publish.ps1 -Platform x64 -Configuration Release
-    powershell -File installer\Publish.ps1 -Platform x64 -Target App   # in VS Developer shell
+    powershell -File installer\Publish.ps1                        # Tray + Cli, x64 Release
+    powershell -File installer\Publish.ps1 -Target Cli
 #>
 param(
     [ValidateSet("x64", "x86", "arm64")]
     [string]$Platform = "x64",
     [ValidateSet("Release", "Debug")]
     [string]$Configuration = "Release",
-    [ValidateSet("Cli", "App")]
-    [string]$Target = "Cli"
+    [ValidateSet("All", "Tray", "Cli", "App")]
+    [string]$Target = "All"
 )
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
 $rid = "win-$($Platform.ToLower())"
-$outDir = Join-Path $root "publish\$rid"
+$dotnet = "C:\Program Files\dotnet\dotnet"
 
-$project = if ($Target -eq "App") {
-    if ($Target -eq "App") {
-        Write-Host "NOTE: the WinUI App project requires Visual Studio 2022 (Build > Publish), the dotnet CLI cannot compile XAML." -ForegroundColor Yellow
-    }
-    Join-Path $root "AIFolderAssistant.App\AIFolderAssistant.App.csproj"
-} else {
-    Join-Path $root "AIFolderAssistant.Cli\AIFolderAssistant.Cli.csproj"
+function Publish-Project($name, $project, $outDir) {
+    Write-Host "Publishing $name ($Configuration|$Platform, $rid)..." -ForegroundColor Cyan
+    & $dotnet publish $project `
+        -c $Configuration -p:Platform=$Platform -r $rid `
+        --self-contained true `
+        -p:PublishSingleFile=true `
+        -p:IncludeNativeLibrariesForSelfExtract=true `
+        -p:DebugType=none -p:DebugSymbols=false `
+        -o $outDir
+    if ($LASTEXITCODE -ne 0) { throw "Publish failed for $name." }
+    Get-ChildItem (Join-Path $outDir "*.exe") | Select-Object Name, @{N="MB";E={[math]::Round($_.Length/1MB,1)}}
 }
 
-Write-Host "Publishing FolderMind ($Target, $Configuration|$Platform, $rid)..." -ForegroundColor Cyan
-& "C:\Program Files\dotnet\dotnet" publish $project `
-    -c $Configuration -p:Platform=$Platform -r $rid `
-    --self-contained true `
-    -p:PublishSingleFile=true `
-    -p:IncludeNativeLibrariesForSelfExtract=true `
-    -o $outDir
-
-if ($LASTEXITCODE -ne 0) { throw "Publish failed." }
-Write-Host "Published to $outDir" -ForegroundColor Green
-Get-ChildItem (Join-Path $outDir "*.exe") | Select-Object Name, @{N="MB";E={[math]::Round($_.Length/1MB,1)}}
+if ($Target -in @("All", "Tray")) {
+    Publish-Project "Tray" (Join-Path $root "AIFolderAssistant.Tray\AIFolderAssistant.Tray.csproj") (Join-Path $root "publish\$rid")
+}
+if ($Target -in @("All", "Cli")) {
+    Publish-Project "Cli" (Join-Path $root "AIFolderAssistant.Cli\AIFolderAssistant.Cli.csproj") (Join-Path $root "publish\cli\$rid")
+}
+if ($Target -eq "App") {
+    Write-Host "The WinUI App project requires Visual Studio 2022: open FolderMind.sln, Build > Publish." -ForegroundColor Yellow
+}

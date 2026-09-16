@@ -42,6 +42,16 @@ public sealed class FolderNameGeneratorTests
     }
 
     [Fact]
+    public void MixedButCoherentFiles_AggregatesByCategory()
+    {
+        var gen = new FolderNameGenerator();
+        var data = DataFor("invoice_123.pdf", "gst_receipt.pdf", "extra_bill.pdf",
+            "notes.txt", "tray_test.txt", "misc.txt", "log.txt", "data.txt");
+        data.DetectedTopics.Add("Financial");
+        Assert.Contains("Financial", gen.GenerateName(data));
+    }
+
+    [Fact]
     public void UnknownFiles_ReturnsNonEmpty()
     {
         var gen = new FolderNameGenerator();
