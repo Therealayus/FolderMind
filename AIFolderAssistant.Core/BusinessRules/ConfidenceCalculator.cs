@@ -4,7 +4,8 @@ namespace AIFolderAssistant.Core.BusinessRules;
 
 /// <summary>
 /// Calculates confidence score for a folder name suggestion based on analysis data.
-/// Uses heuristics based on keyword matching, file type clustering, and other factors.
+/// Calibrated so a small folder with clear keyword/topic agreement scores ≥ 0.80
+/// (the default notify threshold), while thin or conflicting evidence stays low.
 /// </summary>
 public class ConfidenceCalculator : IConfidenceCalculator
 {
@@ -18,35 +19,24 @@ public class ConfidenceCalculator : IConfidenceCalculator
         if (analysis.Files.Count == 0)
             return 0.0;
 
-        var score = 0.0;
-        var totalWeight = 0.0;
+        // File count: saturates fast — 4+ files carry full weight (0.25).
+        var fileScore = Math.Min(analysis.Files.Count / 4.0, 1.0) * 0.25;
 
-        // Factor 1: File count weight (max 0.3)
-        var fileCountFactor = Math.Min(analysis.Files.Count / 10.0, 1.0);
-        score += fileCountFactor * 0.3;
-        totalWeight += 0.3;
+        // Extension coherence: a dominant type (or small set) is a good sign (0.15).
+        var extensionScore = analysis.ExtensionCounts.Count > 0
+            ? Math.Min(analysis.ExtensionCounts.Count / 3.0, 1.0) * 0.15
+            : 0.0;
 
-        // Factor 2: Extension distribution (max 0.3)
-        var extensionDiversity = analysis.ExtensionCounts.Count;
-        var extensionFactor = Math.Min(extensionDiversity / 5.0, 1.0);
-        score += extensionFactor * 0.3;
-        totalWeight += 0.3;
+        // Keyword evidence: the strongest signal (0.35).
+        var keywordScore = analysis.Keywords.Count > 0
+            ? Math.Min(analysis.Keywords.Count / 2.0, 1.0) * 0.35
+            : 0.0;
 
-        // Factor 3: Keyword specificity (max 0.2)
-        var keywordScore = analysis.Keywords.Count > 0 ? Math.Min(analysis.Keywords.Count / 3.0, 1.0) : 0.0;
-        score += keywordScore * 0.2;
-        totalWeight += 0.2;
+        // Topic agreement: detected categories reinforce the suggestion (0.25).
+        var topicScore = analysis.DetectedTopics.Count > 0
+            ? Math.Min(analysis.DetectedTopics.Count / 1.0, 1.0) * 0.25
+            : 0.0;
 
-        // Factor 4: Topic detection (max 0.2)
-        var topicScore = analysis.DetectedTopics.Count > 0 ? Math.Min(analysis.DetectedTopics.Count / 3.0, 1.0) : 0.0;
-        score += topicScore * 0.2;
-        totalWeight += 0.2;
-
-        // Avoid division by zero
-        if (totalWeight <= 0)
-            return 0.0;
-
-        var finalScore = Math.Round(score / totalWeight, 2);
-        return Math.Clamp(finalScore, 0.0, 1.0);
+        return Math.Clamp(Math.Round(fileScore + extensionScore + keywordScore + topicScore, 2), 0.0, 1.0);
     }
 }

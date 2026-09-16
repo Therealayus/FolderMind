@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Platforms>x64;x86;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-x86;win-arm64</RuntimeIdentifiers>
+    <RootNamespace>AIFolderAssistant.Cli</RootNamespace>
+    <AssemblyName>FolderMind</AssemblyName>
+    <ApplicationName>FolderMind AI (Engine Host)</ApplicationName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AIFolderAssistant.Core\AIFolderAssistant.Core.csproj" />
+    <ProjectReference Include="..\AIFolderAssistant.Infrastructure\AIFolderAssistant.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

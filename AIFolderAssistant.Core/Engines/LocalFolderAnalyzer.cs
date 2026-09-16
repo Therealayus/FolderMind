@@ -343,8 +343,8 @@ public class LocalFolderAnalyzer : IFolderAnalyzer
 
         if (analysis.Keywords.Count > 0)
         {
-            var topKeywords = analysis.Keywords.Take(3).ToList();
-            reasons.Add($"Based on {topKeywords.Count} file name{(topKeywords.Count > 1 ? "s are" : " is")}: {string.Join(", ", topKeywords)}");
+            var topKeywords = analysis.Keywords.Distinct(StringComparer.OrdinalIgnoreCase).Take(3).ToList();
+            reasons.Add($"File names mention: {string.Join(", ", topKeywords)}");
         }
 
         if (analysis.DetectedTopics.Count > 0)
@@ -356,17 +356,10 @@ public class LocalFolderAnalyzer : IFolderAnalyzer
         if (analysis.ExtensionCounts.Count > 0)
         {
             var topExt = analysis.ExtensionCounts.OrderByDescending(k => k.Value).First();
-            reasons.Add($"Contains {topExt.Value} file(s) with extension '{topExt.Key}'");
+            reasons.Add($"{topExt.Value} .{topExt.Key} file(s)");
         }
 
-        if (analysis.Files.Count == 1)
-        {
-            reasons.Add("Single file folder");
-        }
-        else
-        {
-            reasons.Add($"Folder with {analysis.Files.Count} file{(analysis.Files.Count > 1 ? "s are" : " is")}");
-        }
+        reasons.Add(analysis.Files.Count == 1 ? "1 file total" : $"{analysis.Files.Count} files total");
 
         return reasons.Count > 0 ? string.Join(". ", reasons) : "Folder analyzed";
     }
