@@ -28,10 +28,11 @@ public class SuggestionService : IFolderAnalyzer
         _confidenceCalculator = confidenceCalculator;
     }
 
-    public async Task<FolderAnalysisResult> AnalyzeAsync(string folderPath, CancellationToken cancellationToken)
+    public async Task<FolderAnalysisResult> AnalyzeAsync(
+        string folderPath, CancellationToken cancellationToken, int maxFiles = FolderMindLimits.DefaultMaxFiles)
     {
         // First, try local analysis
-        var localResult = await _localAnalyzer.AnalyzeAsync(folderPath, cancellationToken);
+        var localResult = await _localAnalyzer.AnalyzeAsync(folderPath, cancellationToken, maxFiles);
 
         // Use the folder name generator to create a suggestion based on local analysis
         var analysisData = new Analysis.FolderAnalysisData

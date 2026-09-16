@@ -36,9 +36,11 @@ public class LocalFolderAnalyzer : IFolderAnalyzer
         _confidenceCalculator = confidenceCalculator;
     }
 
-    public async Task<FolderAnalysisResult> AnalyzeAsync(string folderPath, CancellationToken cancellationToken)
+    public async Task<FolderAnalysisResult> AnalyzeAsync(
+        string folderPath, CancellationToken cancellationToken, int maxFiles = FolderMindLimits.DefaultMaxFiles)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        maxFiles = FolderMindLimits.ClampMaxFiles(maxFiles);
 
         // Ensure folder exists
         if (!Directory.Exists(folderPath))
@@ -50,6 +52,7 @@ public class LocalFolderAnalyzer : IFolderAnalyzer
                 Reason = "The specified folder does not exist.",
                 AlternativeSuggestions = new List<string> { "Please select a valid folder" },
                 FileCount = 0,
+                TotalFileCount = 0,
                 AnalysisTimeMs = 0,
                 UsesCloudAI = false
             };
@@ -60,16 +63,21 @@ public class LocalFolderAnalyzer : IFolderAnalyzer
 
         try
         {
-            // Get all files in the folder (with limits for large folders)
-            var files = Directory.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories)
-                .Where(f => !IsSystemFile(f))
-                .ToList();
+            // Bounded defensive discovery: inaccessible subdirectories are skipped
+            // (never abort the scan), enumeration stops at a hard path cap.
+            var discovered = SafeEnumerateFiles(folderPath, cancellationToken);
 
-            // Limit number of files analyzed for performance
-            const int maxFiles = 500;
-            var filesToAnalyze = files.Take(maxFiles).ToList();
+            // Even stride-sample so huge folders are represented across the whole
+            // tree instead of biasing to whatever the filesystem returns first.
+            var filesToAnalyze = SampleEvenly(discovered, maxFiles);
+            var sampled = filesToAnalyze.Count < discovered.Count;
 
-            analysisData.TotalSize = filesToAnalyze.Sum(f => new FileInfo(f).Length);
+            long totalSize = 0;
+            foreach (var f in filesToAnalyze)
+            {
+                try { totalSize += new FileInfo(f).Length; } catch { /* vanished; ignore */ }
+            }
+            analysisData.TotalSize = totalSize;
 
             foreach (var filePath in filesToAnalyze)
             {
@@ -144,6 +152,8 @@ public class LocalFolderAnalyzer : IFolderAnalyzer
             var suggestedName = _folderNameGenerator.GenerateName(analysisData);
             var confidence = _confidenceCalculator.CalculateConfidence(analysisData);
             var reason = GenerateReason(analysisData);
+            if (sampled)
+                reason += $" (representative sample of {filesToAnalyze.Count} of {discovered.Count} files)";
 
             stopwatch.Stop();
 
@@ -154,6 +164,7 @@ public class LocalFolderAnalyzer : IFolderAnalyzer
                 Reason = reason,
                 AlternativeSuggestions = GenerateAlternativeSuggestions(analysisData),
                 FileCount = analysisData.Files.Count,
+                TotalFileCount = discovered.Count,
                 AnalysisTimeMs = stopwatch.ElapsedMilliseconds,
                 UsesCloudAI = false
             };
@@ -168,6 +179,7 @@ public class LocalFolderAnalyzer : IFolderAnalyzer
                 Reason = "Folder analysis was cancelled.",
                 AlternativeSuggestions = new List<string> { "Try again with a smaller folder" },
                 FileCount = analysisData?.Files.Count ?? 0,
+                TotalFileCount = analysisData?.Files.Count ?? 0,
                 AnalysisTimeMs = stopwatch.ElapsedMilliseconds,
                 UsesCloudAI = false
             };
@@ -182,9 +194,98 @@ public class LocalFolderAnalyzer : IFolderAnalyzer
                 Reason = $"An error occurred during analysis: {ex.Message}",
                 AlternativeSuggestions = new List<string> { "Try a different folder" },
                 FileCount = analysisData?.Files.Count ?? 0,
+                TotalFileCount = analysisData?.Files.Count ?? 0,
                 AnalysisTimeMs = stopwatch.ElapsedMilliseconds,
                 UsesCloudAI = false
             };
+        }
+    }
+
+    /// <summary>
+    /// Iterative breadth-tolerant file discovery. Each directory is enumerated
+    /// independently: denied, missing, or misbehaving subtrees are skipped so a
+    /// single bad folder can never abort the scan. Bounded to
+    /// <see cref="FolderMindLimits.MaxDiscoveredPaths"/> paths; system/hidden
+    /// entries are filtered out. Never throws for filesystem conditions
+    /// (only for cancellation).
+    /// </summary>
+    internal static List<string> SafeEnumerateFiles(string root, CancellationToken cancellationToken)
+    {
+        var paths = new List<string>();
+        var stack = new Stack<string>();
+        stack.Push(root);
+
+        while (stack.Count > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var dir = stack.Pop();
+
+            string[] subdirs;
+            string[] files;
+            try
+            {
+                subdirs = Directory.GetDirectories(dir);
+            }
+            catch (UnauthorizedAccessException) { continue; }
+            catch (DirectoryNotFoundException) { continue; }
+            catch (IOException) { continue; }
+
+            try
+            {
+                files = Directory.GetFiles(dir);
+            }
+            catch (UnauthorizedAccessException) { files = Array.Empty<string>(); }
+            catch (DirectoryNotFoundException) { continue; }
+            catch (IOException) { files = Array.Empty<string>(); }
+
+            foreach (var file in files)
+            {
+                if (paths.Count >= FolderMindLimits.MaxDiscoveredPaths)
+                    return paths;
+                if (!IsSystemFile(file))
+                    paths.Add(file);
+            }
+
+            foreach (var sub in subdirs)
+            {
+                if (paths.Count >= FolderMindLimits.MaxDiscoveredPaths)
+                    return paths;
+                if (!IsSystemDirectory(sub))
+                    stack.Push(sub);
+            }
+        }
+
+        return paths;
+    }
+
+    /// <summary>
+    /// Even stride-sample: when discovery exceeds the cap, picks files spread
+    /// across the whole enumeration instead of the first N. Deterministic.
+    /// </summary>
+    internal static List<string> SampleEvenly(List<string> paths, int maxFiles)
+    {
+        if (paths.Count <= maxFiles)
+            return paths;
+        var stride = (double)paths.Count / maxFiles;
+        var sampled = new List<string>(maxFiles);
+        for (var i = 0; i < maxFiles; i++)
+            sampled.Add(paths[(int)(i * stride)]);
+        return sampled;
+    }
+
+    private static bool IsSystemDirectory(string dir)
+    {
+        try
+        {
+            var attributes = File.GetAttributes(dir);
+            if ((attributes & FileAttributes.System) != 0 || (attributes & FileAttributes.Hidden) != 0)
+                return true;
+            var name = Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            return name.StartsWith(".", StringComparison.Ordinal) || BusinessRules.PathValidator.IsSystemDirectory(dir);
+        }
+        catch
+        {
+            return true;
         }
     }
 

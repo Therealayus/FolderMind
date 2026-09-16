@@ -12,6 +12,15 @@ public class FolderAnalysisResult
     public int FileCount { get; set; }
     public double AnalysisTimeMs { get; set; }
     public bool UsesCloudAI { get; set; }
+
+    /// <summary>
+    /// Total files found during discovery (before sampling). Equals
+    /// <see cref="FileCount"/> when the whole folder fit the limit.
+    /// </summary>
+    public int TotalFileCount { get; set; }
+
+    /// <summary>True when only a representative sample was analyzed.</summary>
+    public bool WasSampled => TotalFileCount > FileCount;
 }
 
 /// <summary>
@@ -22,11 +31,14 @@ public interface IFolderAnalyzer
 {
     /// <summary>
     /// Analyzes a folder and generates a name suggestion.
+    /// Large folders are defensively enumerated and evenly sampled —
+    /// see <see cref="FolderMindLimits"/>.
     /// </summary>
     /// <param name="folderPath">The path of the folder to analyze.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <param name="maxFiles">Maximum files to analyze (representative sample).</param>
     /// <returns>A task that returns the analysis result.</returns>
-    Task<FolderAnalysisResult> AnalyzeAsync(string folderPath, CancellationToken cancellationToken);
+    Task<FolderAnalysisResult> AnalyzeAsync(string folderPath, CancellationToken cancellationToken, int maxFiles = FolderMindLimits.DefaultMaxFiles);
 }
 
 /// <summary>
